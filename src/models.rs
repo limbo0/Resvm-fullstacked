@@ -1,3 +1,4 @@
+use crate::schema::property;
 use axum::{
     extract::{self, Json, Path, Query, State},
     response::{Html, IntoResponse},
@@ -10,9 +11,10 @@ use diesel::{
     expression::AsExpression,
     query_dsl::BelongingToDsl,
     serialize::{self, Output, ToSql},
-    sql_types::{self, Integer, Jsonb},
+    sql_types::{self, Date, Integer, Jsonb, Text},
     Associations, Identifiable, Insertable, Queryable, Selectable,
 };
+use leptos::{IntoView, View};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use time::Time;
@@ -61,6 +63,7 @@ where
 }
 
 //NOTE: AsExpression is converting this struct to sql type Jsonb, which is the data type in our db.
+// String type is stored as Text, NaiveDate type is stored as Date.
 #[derive(AsExpression, Queryable, Debug, Clone, Serialize, Deserialize)]
 #[diesel(sql_type = Jsonb)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -77,9 +80,11 @@ impl FromSqlRow<Jsonb, diesel::pg::Pg> for PaymentMethod {
     ) -> deserialize::Result<Self> {
         Ok(PaymentMethod {
             mode_of_payment: row.get_value(0)?,
-            payment_transaction_id: row.get_value(1)?,
-            payment_receiver: row.get_value(2)?,
-            payment_received_date: row.get_value(3)?,
+            // This needs a type annotation
+            // Text(datatype stored in db), String(datatype we want), usize(datatype for index)
+            payment_transaction_id: Some(row.get_value::<Text, String, usize>(1)?),
+            payment_receiver: Some(row.get_value::<Text, String, usize>(2)?),
+            payment_received_date: Some(row.get_value::<Date, NaiveDate, usize>(3)?),
         })
     }
 }
@@ -134,6 +139,12 @@ impl Reservation {
     }
 }
 
+impl IntoView for Reservation {
+    fn into_view(self) -> View {
+        View::Transparent(leptos::leptos_dom::Transparent::new(self))
+    }
+}
+
 impl Display for Reservation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -155,7 +166,7 @@ impl Display for Reservation {
     }
 }
 
-#[derive(Identifiable, Selectable, Debug, Serialize, Deserialize)]
+#[derive(Clone, Identifiable, Selectable, Debug, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::property)]
 #[diesel(primary_key(property_id))]
 pub struct Property {
@@ -167,7 +178,12 @@ pub struct Property {
     pub property_phone: String,
 }
 
-use crate::schema::property;
+impl IntoView for Property {
+    fn into_view(self) -> View {
+        View::Transparent(leptos::leptos_dom::Transparent::new(self))
+    }
+}
+
 impl Queryable<property::SqlType, DB> for Property {
     type Row = (Uuid, String, String, String, String);
 

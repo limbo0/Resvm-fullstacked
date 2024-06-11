@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{FromRef, Path, State},
     http::Request,
     response::{IntoResponse, Response},
     routing::get,
@@ -8,7 +8,7 @@ use axum::{
 };
 use leptos::*;
 use leptos_axum::{generate_route_list, LeptosRoutes};
-use resvm::{self, app::*};
+use resvm::{app::ResvmApp, get_connection_pool, AppState};
 
 //Define a handler to test extractor with state
 async fn custom_handler(
@@ -36,11 +36,24 @@ async fn main() {
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(ResvmApp);
 
+    let app_state = AppState {
+        leptos_options,
+        pool: get_connection_pool(),
+    };
+
     // build our application with a route
     let app = Router::new()
         .route("/something", get(custom_handler))
-        .leptos_routes(&leptos_options, routes, || view! { <ResvmApp/> })
-        .with_state(leptos_options);
+        .leptos_routes_with_context(
+            &app_state,
+            routes,
+            {
+                let app_state = app_state.clone();
+                move || provide_context(app_state.clone())
+            },
+            || view! { <ResvmApp/> },
+        )
+        .with_state(app_state);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
