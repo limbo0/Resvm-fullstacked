@@ -29,9 +29,7 @@ async fn custom_handler(
 #[tokio::main]
 async fn main() {
     // Setting this to None means we'll be using cargo-leptos and its env vars
-    let conf = get_configuration(Some("/home/khewa/resv_manager/resvm/Cargo.toml"))
-        .await
-        .unwrap();
+    let conf = get_configuration(None).await.unwrap();
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(ResvmApp);

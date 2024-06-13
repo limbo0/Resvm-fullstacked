@@ -1,4 +1,5 @@
-.pending {
-	color: purple;
+.container {
+  display: flex;
+  flex-direction: column;
+  color: purple;
 }
-

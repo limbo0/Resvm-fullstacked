@@ -9,7 +9,6 @@ use diesel::*;
 use diesel::{
     deserialize::{self, FromSql, FromSqlRow},
     expression::AsExpression,
-    query_dsl::BelongingToDsl,
     serialize::{self, Output, ToSql},
     sql_types::{self, Date, Integer, Jsonb, Text},
     Associations, Identifiable, Insertable, Queryable, Selectable,
@@ -25,10 +24,10 @@ type DB = diesel::pg::Pg;
 #[derive(Debug, Serialize, Deserialize, Clone, AsExpression)]
 #[diesel(sql_type = Integer)]
 pub enum PaymentMode {
-    NotPaid = 1,
-    Cash = 2,
-    Card = 3,
-    Gpay = 4,
+    NotPaid = 0,
+    Cash = 1,
+    Card = 2,
+    Gpay = 3,
 }
 
 impl<DB> ToSql<Integer, DB> for PaymentMode
@@ -89,7 +88,7 @@ impl FromSqlRow<Jsonb, diesel::pg::Pg> for PaymentMethod {
     }
 }
 
-#[derive(Serialize, Deserialize, Insertable)]
+#[derive(Clone, Serialize, Deserialize, Insertable, Debug, PartialEq)]
 #[diesel(table_name = crate::schema::reservation)]
 pub struct NewResv {
     pub name: String,

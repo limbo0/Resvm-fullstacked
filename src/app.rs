@@ -1,159 +1,22 @@
-use crate::error_template::ErrorTemplate;
-use crate::models::{NewResv, Property, Reservation};
-use crate::AppState;
-use crate::SharedPooledConnection;
-use axum::{
-    extract::{Json, Path, Query, State},
-    response::{Html, IntoResponse},
+use crate::{
+    crud_properties::{
+        add_reservation, get_all_properties, get_property_reservations, total_resv, AddResv,
+        PropertyIdParam,
+    },
+    models::NewResv,
 };
-use chrono::NaiveDate;
-use diesel::prelude::*;
 use leptos::*;
-use leptos_axum::extract_with_state;
+use leptos_meta::{provide_meta_context, Meta, Stylesheet};
 use leptos_router::{
     use_params, use_params_map, ActionForm, MultiActionForm, Outlet, Params, Route, Router, Routes,
     A,
 };
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
-pub mod ssr {
-    // use http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode};
-    use diesel::pg::PgConnection;
-    use diesel::prelude::*;
-    use dotenvy::dotenv;
-    use std::env;
-
-    pub fn establish_connection() -> PgConnection {
-        dotenv().ok();
-
-        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        PgConnection::establish(&database_url)
-            .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
-    }
-}
-
-#[server(AllProperties, "/api", "GetJson", "all_properties")]
-async fn get_all_properties() -> Result<Vec<Property>, ServerFnError> {
-    use crate::schema::property::dsl::{property, property_id};
-    let state = expect_context::<AppState>();
-
-    match property
-        .select(Property::as_select())
-        .load(&mut state.pool.try_get().unwrap())
-    {
-        Ok(_result) => Ok(_result),
-        Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-    }
-}
-
-#[derive(PartialEq, Params, Debug)]
-pub struct PropertyIdParam {
-    pid: Option<Uuid>,
-}
-#[server(PropertyReservations, "/api", "GetJson", "pid")]
-async fn get_property_reservations(pid: Uuid) -> Result<Vec<Reservation>, ServerFnError> {
-    use crate::schema::reservation::dsl::{property_id, reservation, reservation_date};
-
-    let state = expect_context::<AppState>();
-    // let conn: AppState = extract_with_state(&state).await.unwrap();
-
-    match reservation
-        .filter(property_id.eq(pid))
-        // .filter(reservation_date.eq(chrono::offset::Local::now().date_naive()))
-        .limit(5)
-        .select(Reservation::as_select())
-        .load(&mut state.pool.try_get().unwrap())
-    {
-        Ok(_result) => Ok(_result),
-        Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-    }
-}
-
-// async fn get_users() -> Result<Vec<MyUsers>, ServerFnError> {
-//     use crate::schema::myusers::dsl::myusers;
-//     use diesel::*;
-//     use http::request::Parts;
-//     use ssr::establish_connection;
-//
-//     // this is just an example of how to access server context injected in the handlers
-//     let req_parts = use_context::<Parts>();
-//     if let Some(req_parts) = req_parts {
-//         println!("getting Uri = {:?}", req_parts.uri);
-//     }
-//     let mut db = establish_connection();
-//
-//     match myusers.select(MyUsers::as_select()).load(&mut db) {
-//         Ok(_result) => Ok(_result),
-//         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-//     }
-// }
-
-// #[server(AddReservation, "/api", "Url", "add_reservation")]
-// async fn add_reservation() -> Result<Vec<i32>, ServerFnError> {
-//     //TODO: Send the necessary data to the provided contacts.
-//     use crate::schema::reservation::dsl::{id, reservation};
-//     let new_resv = NewResv {
-//         name: payload.name,
-//         contact: payload.contact,
-//         seating: payload.seating,
-//         specific_seating_requested: payload.specific_seating_requested,
-//         advance: payload.advance,
-//         advance_method: payload.advance_method,
-//         advance_amount: payload.advance_amount,
-//         confirmed: payload.confirmed,
-//         reservation_date: payload.reservation_date,
-//         reservation_time: payload.reservation_time,
-//         property_id: payload.property_id,
-//     };
-//
-//     match diesel::insert_into(reservation)
-//         .values(&new_resv)
-//         .returning(id)
-//         .get_results::<i32>(&mut conn.try_get().unwrap())
-//     {
-//         Ok(_id) => Ok(_id),
-//         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-//     }
-// }
-
-// async fn add_reservation(user_name: String, user_role: String) -> Result<(), ServerFnError> {
-//     use crate::schema::myusers::dsl::{myusers, name};
-//     use diesel::*;
-//     use ssr::establish_connection;
-//
-//     let mut db = establish_connection();
-//
-//     let new_user = NewUser {
-//         name: user_name,
-//         role: user_role,
-//     };
-//
-//     match diesel::insert_into(myusers)
-//         .values(&new_user)
-//         .execute(&mut db)
-//     {
-//         Ok(_row) => Ok(()),
-//         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-//     }
-// }
-
-// #[server(DeleteReservation, "/api", "Url", "delete_reservation")]
-// async fn delete_reservation(user_id: i32) -> Result<(), ServerFnError> {
-//     use crate::schema::myusers::dsl::{id, myusers};
-//     use diesel::*;
-//     use ssr::establish_connection;
-//
-//     let mut db = establish_connection();
-//     match diesel::delete(myusers.filter(id.eq(user_id))).execute(&mut db) {
-//         Ok(_row) => Ok(()),
-//         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
-//     }
-// }
 
 #[component]
 pub fn ResvmApp() -> impl IntoView {
+    provide_meta_context();
     view! {
+        <Stylesheet href="/pkg/resvm.css"/>
         <Router>
             <header>
                 <h1>"This is the resv manager"</h1>
@@ -162,9 +25,18 @@ pub fn ResvmApp() -> impl IntoView {
             <a href="/Property">"Properties"</a>
             <main>
                 <Routes>
-                    <Route path="/" view=|| view! { <h1>"The first page"</h1> }/>
+                    <Route path="/" view=|| view! { <h1>"Make this the homepage"</h1> }/>
                     <Route path="/Property" view=Properties>
-                        <Route path=":pid" view=PropertyReservations/>
+                        <Route path=":pid" view=PropertyReservations>
+                            <Route path="add_resv" view=AddReservation/>
+                            <Route
+                                path=""
+                                view=|| {
+                                    view! { <div>"Handle this error"</div> }
+                                }
+                            />
+
+                        </Route>
                         // if no pid specified, fall back
                         <Route
                             path=""
@@ -185,6 +57,56 @@ pub fn ResvmApp() -> impl IntoView {
 }
 
 #[component]
+fn AddReservation() -> impl IntoView {
+    let params = use_params::<PropertyIdParam>();
+    let pid = move || {
+        params
+            .with(|params| params.as_ref().map(|params| params.pid).unwrap_or_default())
+            .expect("Failed to get pid.")
+    };
+
+    let action = create_server_action::<AddResv>();
+
+    let resv_count = create_resource(
+        move || action.version().get(),
+        move |_| async move { total_resv(pid()).await },
+    );
+
+    view! {
+        <ActionForm action class="container">
+            <div class="container">
+                <div class="row">
+                    <div class="col">
+
+                        <input type="text" name="name"/>
+                        <input type="text" name="contact"/>
+                        <input type="text" name="seating"/>
+                        <input type="checkbox" name="specific_seating_requested" value="true"/>
+                        <input type="checkbox" name="advance" value="true"/>
+                        <input type="number" name="mop"/>
+                        <input type="text" name="ptid"/>
+                        <input type="text" name="prc"/>
+                        <input type="date" name="prd"/>
+                        <input type="number" name="advance_amount"/>
+                        <input type="checkbox" name="confirmed" value="true"/>
+                        <input type="date" name="reservation_date"/>
+                        <input type="text" name="reservation_time" minlength="4" maxlength="4"/>
+                        <input type="text" name="property_id"/>
+                        <button>Submit</button>
+
+                    </div>
+                </div>
+            </div>
+        </ActionForm>
+        <p>You submitted: {move || format!("{:?}", action.input().get())}</p>
+        <p>The result was: {move || format!("{:?}", action.value().get())}</p>
+        <Transition>
+            <p>Total rows: {resv_count}</p>
+        </Transition>
+    }
+}
+
+#[component]
 fn PropertyReservations() -> impl IntoView {
     let params = use_params::<PropertyIdParam>();
     let pid = move || {
@@ -193,7 +115,6 @@ fn PropertyReservations() -> impl IntoView {
             .expect("Failed to get pid.")
     };
 
-    // Maybe use spawn_local?
     let reservations = create_resource(
         || (),
         move |_| async move { get_property_reservations(pid()).await },
@@ -231,12 +152,46 @@ fn PropertyReservations() -> impl IntoView {
                                                             <p>{resv.seating}</p>
                                                             <p>{resv.specific_seating_requested}</p>
                                                             <p>{resv.advance}</p>
-                                                            // <p>{resv.advance_method}</p>
+                                                            <p>
+                                                                {move || {
+                                                                    view! {
+                                                                        <li>
+                                                                            <p>
+                                                                                {String::from(
+                                                                                    resv
+                                                                                        .advance_method["mode_of_payment"]
+                                                                                        .as_str()
+                                                                                        .unwrap_or_else(|| "Not paid"),
+                                                                                )}
+
+                                                                            </p>
+                                                                            <p>
+                                                                                {String::from(
+                                                                                    resv
+                                                                                        .advance_method["payment_transaction_id"]
+                                                                                        .as_str()
+                                                                                        .unwrap_or_else(|| "No txn id"),
+                                                                                )}
+
+                                                                            </p>
+                                                                            <p>
+                                                                                {String::from(
+                                                                                    resv
+                                                                                        .advance_method["payment_received_date"]
+                                                                                        .as_str()
+                                                                                        .unwrap_or_else(|| "Not reveived"),
+                                                                                )}
+
+                                                                            </p>
+                                                                        </li>
+                                                                    }
+                                                                }}
+
+                                                            </p>
                                                             <p>{resv.advance_amount}</p>
                                                             <p>{resv.confirmed}</p>
-                                                            // <p>{resv.reservation_date}</p>
-                                                            // <p>{resv.reservation_time}</p>
-                                                            <p>{String::from(resv.property_id)}</p>
+                                                        // <p>{resv.reservation_date}</p>
+                                                        // <p>{resv.reservation_time}</p>
                                                         </li>
                                                     </div>
                                                 }
