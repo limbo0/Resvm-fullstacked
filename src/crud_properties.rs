@@ -1,4 +1,5 @@
-use crate::models::{NewResv, Property, Reservation};
+use crate::models::{NewProperty, NewResv, PaymentMethod, PaymentMode, Property, Reservation};
+use crate::salt_password;
 use crate::AppState;
 use chrono::NaiveDate;
 use diesel::prelude::*;
@@ -44,6 +45,36 @@ pub async fn get_property_reservations(pid: Uuid) -> Result<Vec<Reservation>, Se
         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
     }
 }
+#[server(name = AddProperty, prefix = "/api", endpoint = "add_property", input = Json, output = Json, encoding = "Url", impl_from = true)]
+pub async fn add_property(
+    property_name: String,
+    property_password: String,
+    property_email: String,
+    property_phone: String,
+) -> Result<Uuid, ServerFnError> {
+    use crate::schema::property::dsl::{property, property_id};
+
+    let state = expect_context::<AppState>();
+
+    let new_property = NewProperty::new(
+        Uuid::new_v4(),
+        property_name,
+        salt_password(property_password)
+            .await
+            .expect("failed to salt property password"),
+        property_email,
+        property_phone,
+    );
+
+    match diesel::insert_into(property)
+        .values(&new_property)
+        .returning(property_id)
+        .get_result::<Uuid>(&mut state.pool.try_get().unwrap())
+    {
+        Ok(_pid) => Ok(_pid),
+        Err(e) => Err(ServerFnError::ServerError(e.to_string())),
+    }
+}
 
 #[server(name = AddResv, prefix = "/api", endpoint = "add_resv", input = Json, output = Json, encoding = "Url", impl_from = true)]
 pub async fn add_reservation(
@@ -52,33 +83,42 @@ pub async fn add_reservation(
     seating: String,
     specific_seating_requested: bool,
     advance: bool,
-    mop: i32,
-    ptid: Option<String>,
-    prc: Option<String>,
-    prd: Option<NaiveDate>,
+    mode_of_payment: String,
+    payment_transaction_id: Option<String>,
+    payment_receiver: Option<String>,
+    payment_received_date: Option<NaiveDate>,
     advance_amount: Option<i32>,
     confirmed: bool,
     reservation_date: NaiveDate,
     reservation_time: String,
     property_id: Uuid,
-) -> Result<Vec<i32>, ServerFnError> {
+) -> Result<i32, ServerFnError> {
     use crate::schema::reservation::dsl::{id, reservation};
 
     let state = expect_context::<AppState>();
-    let advance_method = serde_json::json!({
-        "mode_of_payment": mop,
-        "payment_transaction_id": ptid,
-        "payment_receiver": prc,
-        "payment_received_date": prd,
-    });
 
+    let advance_method = serde_json::to_value(PaymentMethod::new(
+        match mode_of_payment {
+            mode_of_payment if mode_of_payment == String::from("NotPaid") => PaymentMode::NotPaid,
+            mode_of_payment if mode_of_payment == String::from("Cash") => PaymentMode::Cash,
+            mode_of_payment if mode_of_payment == String::from("Card") => PaymentMode::Card,
+            mode_of_payment if mode_of_payment == String::from("Gpay") => PaymentMode::Gpay,
+            _ => PaymentMode::NotPaid,
+        },
+        payment_transaction_id,
+        payment_receiver,
+        payment_received_date,
+    ))
+    .expect("failed to convert struct into json");
+
+    // Constructing time with only needed properties.
+    // In the front end the max length of input should be 4.
     let resvt = reservation_time.trim();
     let hour: u8 = resvt[..2].parse::<u8>()?;
     let min: u8 = resvt[2..4].parse::<u8>()?;
     let reservation_time = Time::from_hms(hour, min, 0u8)?;
 
-    //TODO: pass this without creating a temp variable.
-    let new_resv = NewResv {
+    let new_resv = NewResv::new(
         name,
         contact,
         seating,
@@ -90,14 +130,14 @@ pub async fn add_reservation(
         reservation_date,
         reservation_time,
         property_id,
-    };
+    );
 
     match diesel::insert_into(reservation)
         .values(&new_resv)
         .returning(id)
-        .get_results::<i32>(&mut state.pool.try_get().unwrap())
+        .get_result::<i32>(&mut state.pool.try_get().unwrap())
     {
-        Ok(_id) => Ok(_id),
+        Ok(rid) => Ok(rid),
         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
     }
 }
@@ -133,8 +173,7 @@ pub async fn total_resv(pid: Uuid) -> Result<i64, ServerFnError> {
 //     match diesel::insert_into(myusers)
 //         .values(&new_user)
 //         .execute(&mut db)
-//     {
-//         Ok(_row) => Ok(()),
+//     { Ok(_row) => Ok(()),
 //         Err(e) => Err(ServerFnError::ServerError(e.to_string())),
 //     }
 // }

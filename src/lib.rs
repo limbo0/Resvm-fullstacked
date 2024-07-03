@@ -4,6 +4,7 @@ pub mod error_template;
 pub mod errors;
 pub mod models;
 pub mod schema;
+use argon2::{self, Config};
 use axum::extract::FromRef;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -11,6 +12,7 @@ use diesel::{
 };
 use dotenvy::dotenv;
 use leptos::LeptosOptions;
+use rand::RngCore;
 use std::{env, sync::Arc};
 
 type SharedPooledConnection = Arc<Pool<ConnectionManager<PgConnection>>>;
@@ -36,18 +38,13 @@ pub struct AppState {
     pub pool: SharedPooledConnection,
 }
 
-// pub mod ssr {
-//     // use http::{header::SET_COOKIE, HeaderMap, HeaderValue, StatusCode};
-//     use diesel::pg::PgConnection;
-//     use diesel::prelude::*;
-//     use dotenvy::dotenv;
-//     use std::env;
-//
-//     pub fn establish_connection() -> PgConnection {
-//         dotenv().ok();
-//
-//         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-//         PgConnection::establish(&database_url)
-//             .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
-//     }
-// }
+/// Password hasher.
+pub async fn salt_password(secret: String) -> anyhow::Result<String> {
+    let mut salt = [0u8; 8];
+    rand::thread_rng().fill_bytes(&mut salt);
+    // println!("salt: {:?}", salt);
+
+    let config = Config::default();
+    let hash_p = argon2::hash_encoded(secret.as_bytes(), &salt, &config).unwrap();
+    Ok(hash_p)
+}

@@ -1,4 +1,5 @@
 use crate::schema::property;
+use crate::SharedPooledConnection;
 use axum::{
     extract::{self, Json, Path, Query, State},
     response::{Html, IntoResponse},
@@ -67,10 +68,10 @@ where
 #[diesel(sql_type = Jsonb)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct PaymentMethod {
-    pub mode_of_payment: PaymentMode,
-    pub payment_transaction_id: Option<String>,
-    pub payment_receiver: Option<String>,
-    pub payment_received_date: Option<NaiveDate>,
+    mode_of_payment: PaymentMode,
+    payment_transaction_id: Option<String>,
+    payment_receiver: Option<String>,
+    payment_received_date: Option<NaiveDate>,
 }
 
 impl FromSqlRow<Jsonb, diesel::pg::Pg> for PaymentMethod {
@@ -88,20 +89,66 @@ impl FromSqlRow<Jsonb, diesel::pg::Pg> for PaymentMethod {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Insertable, Debug, PartialEq)]
+impl PaymentMethod {
+    pub fn new(
+        mode_of_payment: PaymentMode,
+        payment_transaction_id: Option<String>,
+        payment_receiver: Option<String>,
+        payment_received_date: Option<NaiveDate>,
+    ) -> Self {
+        Self {
+            mode_of_payment,
+            payment_transaction_id,
+            payment_receiver,
+            payment_received_date,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Insertable, Debug)]
 #[diesel(table_name = crate::schema::reservation)]
 pub struct NewResv {
-    pub name: String,
-    pub contact: String,
-    pub seating: String,
-    pub specific_seating_requested: bool,
-    pub advance: bool,
-    pub advance_method: serde_json::Value,
-    pub advance_amount: Option<i32>,
-    pub confirmed: bool,
-    pub reservation_date: NaiveDate,
-    pub reservation_time: Time,
-    pub property_id: Uuid,
+    name: String,
+    contact: String,
+    seating: String,
+    specific_seating_requested: bool,
+    advance: bool,
+    advance_method: serde_json::Value,
+    advance_amount: Option<i32>,
+    confirmed: bool,
+    reservation_date: NaiveDate,
+    reservation_time: Time,
+    property_id: Uuid,
+}
+
+impl NewResv {
+    pub fn new(
+        name: String,
+        contact: String,
+        seating: String,
+        specific_seating_requested: bool,
+        advance: bool,
+        advance_method: serde_json::Value,
+        advance_amount: Option<i32>,
+        confirmed: bool,
+        reservation_date: NaiveDate,
+        reservation_time: Time,
+        property_id: Uuid,
+    ) -> Self {
+        Self {
+            name,
+            contact,
+            seating,
+            specific_seating_requested,
+            advance,
+            advance_method,
+            advance_amount,
+            confirmed,
+            reservation_date,
+            reservation_time,
+            property_id,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Queryable, Selectable, Serialize, Deserialize)]
@@ -120,22 +167,6 @@ pub struct Reservation {
     pub reservation_date: NaiveDate,
     pub reservation_time: Time,
     pub property_id: Uuid,
-}
-use crate::{get_connection_pool, SharedPooledConnection};
-impl Reservation {
-    #[axum_macros::debug_handler]
-    pub async fn find_all() -> Json<Vec<Reservation>> {
-        use crate::schema::reservation::dsl::{reservation, reservation_date};
-
-        let results = reservation
-            .filter(reservation_date.eq(chrono::offset::Local::now().date_naive()))
-            .limit(5)
-            .select(Reservation::as_select())
-            .load(&mut get_connection_pool().try_get().unwrap())
-            .expect("Error loading resv");
-
-        Json(results)
-    }
 }
 
 impl IntoView for Reservation {
@@ -212,15 +243,33 @@ impl Queryable<property::SqlType, DB> for Property {
 
 //TODO: this should be the entry point for any new client.
 // Add a field of phone number.
-#[derive(Serialize, Deserialize, Insertable)]
+#[derive(Clone, Debug, Serialize, Deserialize, Insertable)]
 #[diesel(table_name = crate::schema::property)]
 pub struct NewProperty {
-    pub property_id: uuid::Uuid,
-    pub property_name: String,
-    #[serde(skip_serializing)]
-    pub property_password: String,
-    pub property_email: String,
-    pub property_phone: String,
+    property_id: uuid::Uuid,
+    property_name: String,
+    //#[serde(skip_serializing)]
+    property_password: String,
+    property_email: String,
+    property_phone: String,
+}
+
+impl NewProperty {
+    pub fn new(
+        property_id: uuid::Uuid,
+        property_name: String,
+        property_password: String,
+        property_email: String,
+        property_phone: String,
+    ) -> Self {
+        Self {
+            property_id,
+            property_name,
+            property_password,
+            property_email,
+            property_phone,
+        }
+    }
 }
 
 #[derive(
@@ -230,23 +279,57 @@ pub struct NewProperty {
 #[diesel(table_name = crate::schema::propertyusers)]
 #[diesel(belongs_to(Property, foreign_key = property_id))]
 pub struct PropertyUsers {
-    pub user_id: i32,
-    pub user_name: String,
+    user_id: i32,
+    user_name: String,
     #[serde(skip_serializing)]
-    pub user_password: String,
-    pub user_role: i32,
-    pub property_id: Uuid,
+    user_password: String,
+    user_role: i32,
+    property_id: Uuid,
+}
+
+impl PropertyUsers {
+    pub fn new(
+        user_id: i32,
+        user_name: String,
+        user_password: String,
+        user_role: i32,
+        property_id: Uuid,
+    ) -> Self {
+        Self {
+            user_id,
+            user_name,
+            user_password,
+            user_role,
+            property_id,
+        }
+    }
 }
 
 //TODO: this struct should only be accessable after property login.
 #[derive(Serialize, Deserialize, Insertable)]
 #[diesel(table_name = crate::schema::propertyusers)]
 pub struct NewPropertyUser {
-    pub user_name: String,
+    user_name: String,
     #[serde(skip_serializing)]
-    pub user_password: String,
-    pub user_role: i32,
-    pub property_id: Uuid,
+    user_password: String,
+    user_role: i32,
+    property_id: Uuid,
+}
+
+impl NewPropertyUser {
+    pub fn new(
+        user_name: String,
+        user_password: String,
+        user_role: i32,
+        property_id: Uuid,
+    ) -> Self {
+        Self {
+            user_name,
+            user_password,
+            user_role,
+            property_id,
+        }
+    }
 }
 
 #[repr(i32)]
@@ -262,15 +345,20 @@ pub enum Role {
 #[derive(Queryable, Selectable, Insertable, Debug, PartialEq, Serialize, Deserialize)]
 #[diesel(table_name = crate::schema::roles)]
 pub struct Roles {
-    pub role_id: i32,
-    pub role_name: String,
+    role_id: i32,
+    role_name: String,
 }
 
 impl Roles {
-    pub fn get_role(role_name: String, conn: SharedPooledConnection) -> anyhow::Result<i32> {
+    pub fn new(role_id: i32, role_name: String) -> Self {
+        Self { role_id, role_name }
+    }
+
+    /// Pass users id it will return role name for that id.
+    pub fn get_role(user_role_id: i32, conn: SharedPooledConnection) -> anyhow::Result<i32> {
         use crate::schema::roles::dsl::{role_id, role_name, roles};
         Ok(roles
-            .filter(role_name.eq(role_name))
+            .filter(role_id.eq(user_role_id))
             .select(role_id)
             .get_result(&mut conn.try_get().unwrap())
             .unwrap())

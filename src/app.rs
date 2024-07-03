@@ -32,7 +32,9 @@ pub fn ResvmApp() -> impl IntoView {
                             <Route
                                 path=""
                                 view=|| {
-                                    view! { <div>"Handle this error"</div> }
+                                    view! {
+                                        <div>"Handle this inner route after add_resv error"</div>
+                                    }
                                 }
                             />
 
@@ -74,34 +76,96 @@ fn AddReservation() -> impl IntoView {
 
     view! {
         <ActionForm action class="container">
-            <div class="container">
-                <div class="row">
-                    <div class="col">
+            <fieldset>
+                <legend>Fill reservation data</legend>
+                <div class="col">
+                    <label>"Name: " <input type="text" name="name"/></label>
+                    <label>"Contact: " <input type="text" name="contact"/></label>
+                    <label>"Seating: " <input type="text" name="seating"/></label>
 
-                        <input type="text" name="name"/>
-                        <input type="text" name="contact"/>
-                        <input type="text" name="seating"/>
-                        <input type="checkbox" name="specific_seating_requested" value="true"/>
-                        <input type="checkbox" name="advance" value="true"/>
-                        <input type="number" name="mop"/>
-                        <input type="text" name="ptid"/>
-                        <input type="text" name="prc"/>
-                        <input type="date" name="prd"/>
-                        <input type="number" name="advance_amount"/>
-                        <input type="checkbox" name="confirmed" value="true"/>
-                        <input type="date" name="reservation_date"/>
-                        <input type="text" name="reservation_time" minlength="4" maxlength="4"/>
-                        <input type="text" name="property_id"/>
-                        <button>Submit</button>
+                    <fieldset>
+                        <legend>specific seating</legend>
+                        <label>
+                            <input type="radio" name="specific_seating_requested" value="true"/>
+                            true
+                        </label>
+                        <label>
+                            <input type="radio" name="specific_seating_requested" value="false"/>
+                            false
+                        </label>
+                    </fieldset>
 
-                    </div>
+                    <fieldset>
+                        <legend>Advance</legend>
+                        <label>
+                            <input type="radio" name="advance" value="true"/>
+                            true
+                        </label>
+                        <label>
+                            <input type="radio" name="advance" value="false"/>
+                            false
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Mode of payment</legend>
+                        <label>
+                            <input type="radio" name="mode_of_payment" value="NotPaid"/>
+                            NotPaid
+                        </label>
+                        <label>
+                            <input type="radio" name="mode_of_payment" value="Cash"/>
+                            Cash
+                        </label>
+                        <label>
+                            <input type="radio" name="mode_of_payment" value="Card"/>
+                            Card
+                        </label>
+                        <label>
+                            <input type="radio" name="mode_of_payment" value="Gpay"/>
+                            Gpay
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Payment details</legend>
+                        <label>
+                            "Payment tx id: " <input type="text" name="payment_transaction_id"/>
+                        </label>
+                        <label>
+                            "Payment receiver: " <input type="text" name="payment_receiver"/>
+                        </label>
+                        <label>
+                            "Payment received date: "
+                            <input type="date" name="payment_received_date"/>
+                        </label>
+                        <label>
+                            "Advance amount: " <input type="number" name="advance_amount"/>
+                        </label>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Date and time</legend>
+                        <label>
+                            "Confirmed: " <input type="checkbox" name="confirmed" value="true"/>
+                        </label>
+                        <label>
+                            "Reservation date: " <input type="date" name="reservation_date"/>
+                        </label>
+                        <label>
+                            "Reservation time: "
+                            <input type="text" name="reservation_time" minlength="4" maxlength="4"/>
+                        </label>
+                        <label>"Property id: " <input type="text" name="property_id"/></label>
+                    </fieldset>
+                    <button>Submit</button>
                 </div>
-            </div>
+            </fieldset>
         </ActionForm>
         <p>You submitted: {move || format!("{:?}", action.input().get())}</p>
         <p>The result was: {move || format!("{:?}", action.value().get())}</p>
         <Transition>
-            <p>Total rows: {resv_count}</p>
+            <p>Total number of reservations: {resv_count}</p>
         </Transition>
     }
 }
@@ -145,54 +209,98 @@ fn PropertyReservations() -> impl IntoView {
                                             .map(|resv| {
                                                 view! {
                                                     <div>
-                                                        <li>
-                                                            <p>{resv.id}</p>
-                                                            <p>{resv.name}</p>
-                                                            <p>{resv.contact}</p>
-                                                            <p>{resv.seating}</p>
-                                                            <p>{resv.specific_seating_requested}</p>
-                                                            <p>{resv.advance}</p>
-                                                            <p>
-                                                                {move || {
-                                                                    view! {
-                                                                        <li>
-                                                                            <p>
-                                                                                {String::from(
-                                                                                    resv
-                                                                                        .advance_method["mode_of_payment"]
-                                                                                        .as_str()
-                                                                                        .unwrap_or_else(|| "Not paid"),
-                                                                                )}
+                                                        <table>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Id</th>
+                                                                    <th>Name</th>
+                                                                    <th>Contact</th>
+                                                                    <th>Seating</th>
+                                                                    <th>Specific seating</th>
+                                                                    <th>Advance</th>
+                                                                    <th>Mode of payment</th>
+                                                                    <th>Payment tx Id</th>
+                                                                    <th>Payment received date</th>
+                                                                    <th>Advance amount</th>
+                                                                    <th>Confirmed</th>
+                                                                    <th>Reservation date</th>
+                                                                    <th>Reservation time</th>
+                                                                    <th>Property Id</th>
+                                                                </tr>
+                                                            </thead>
 
-                                                                            </p>
-                                                                            <p>
-                                                                                {String::from(
-                                                                                    resv
-                                                                                        .advance_method["payment_transaction_id"]
-                                                                                        .as_str()
-                                                                                        .unwrap_or_else(|| "No txn id"),
-                                                                                )}
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td>
+                                                                        <p>{resv.id}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.name}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.contact}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.seating}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.specific_seating_requested}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.advance}</p>
+                                                                    </td>
+                                                                    <td>
+                                                                        {move || {
+                                                                            view! {
+                                                                                <td>
+                                                                                    {String::from(
+                                                                                        resv
+                                                                                            .advance_method["mode_of_payment"]
+                                                                                            .as_str()
+                                                                                            .unwrap_or_else(|| "Payment not received"),
+                                                                                    )}
 
-                                                                            </p>
-                                                                            <p>
-                                                                                {String::from(
-                                                                                    resv
-                                                                                        .advance_method["payment_received_date"]
-                                                                                        .as_str()
-                                                                                        .unwrap_or_else(|| "Not reveived"),
-                                                                                )}
+                                                                                </td>
+                                                                                <td>
+                                                                                    {String::from(
+                                                                                        resv
+                                                                                            .advance_method["payment_transaction_id"]
+                                                                                            .as_str()
+                                                                                            .unwrap_or_else(|| "Not transaction id"),
+                                                                                    )}
 
-                                                                            </p>
-                                                                        </li>
-                                                                    }
-                                                                }}
+                                                                                </td>
+                                                                                <td>
+                                                                                    {String::from(
+                                                                                        resv
+                                                                                            .advance_method["payment_received_date"]
+                                                                                            .as_str()
+                                                                                            .unwrap_or_else(|| "Payment not reveived"),
+                                                                                    )}
 
-                                                            </p>
-                                                            <p>{resv.advance_amount}</p>
-                                                            <p>{resv.confirmed}</p>
-                                                        // <p>{resv.reservation_date}</p>
-                                                        // <p>{resv.reservation_time}</p>
-                                                        </li>
+                                                                                </td>
+                                                                            }
+                                                                        }}
+
+                                                                    </td>
+                                                                    <td>
+                                                                        {move || {
+                                                                            if let Some(amount) = resv.advance_amount {
+                                                                                if amount <= 0 { 0 } else { amount }
+                                                                            } else {
+                                                                                0
+                                                                            }
+                                                                        }}
+
+                                                                    </td>
+                                                                    <td>
+                                                                        <p>{resv.confirmed}</p>
+                                                                    </td>
+                                                                // <p>{resv.reservation_date}</p>
+                                                                // <p>{resv.reservation_time}</p>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
                                                     </div>
                                                 }
                                             })
@@ -344,4 +452,4 @@ fn Properties() -> impl IntoView {
 //
 //         </div>
 //     }
-// }
+// };

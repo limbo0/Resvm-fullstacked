@@ -27,6 +27,8 @@ chrono = { version = "0.4.38", features = ["serde"]}
 time = { version = "0.3.36", features = ["serde", "macros"]} 
 axum-macros = "0.4.1"
 anyhow = "1.0.86"
+rand = "0.8.5"
+rust-argon2 = "2.1.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
